@@ -107,7 +107,7 @@ $('#fab').onclick=()=>{draft=newDraft(view==='cal'?cal.d:T());step=0;render()};
 A.setVolume(db.set.vol);
 A.subscribe(a=>{const r=$('#ring');r.hidden=a.state==='idle';if(a.state==='idle')return render();
 r.innerHTML=`<div><div class="pulse">🔔</div><h2>${esc(a.task?a.task.title:'')}</h2><p>${a.state==='ringing'?(a.error||'Rappel en cours'):'Fin du rappel…'}</p>${a.state==='ringing'?`<div class="row"><button class="btn" style="min-height:56px" data-r="stop">Arrêter</button>${a.task&&byId(a.task.id)?`<button class="btn g" data-r="snz">Reporter ${db.set.snooze} min</button>`:''}</div>`:''}</div>`});
-$('#ring').addEventListener('click',e=>{const k=e.target.closest('[data-r]');if(!k)return;
+$('#ring').addEventListener('click',e=>{const k=e.target.closest('[data-r]');if(!k){A.retry();return}
 if(k.dataset.r==='stop'){const t=A.task&&byId(A.task.id);A.stop();if(t&&!t.snoozeUntil)save()}
 else{const t=A.snooze();const x=t&&byId(t.id);if(x){x.snoozeUntil=Date.now()+db.set.snooze*6e4;x.fired=false;save();toast('Reporté de '+db.set.snooze+' min')}}});
 function tick(){if(A.state!=='idle')return;const n=Date.now();
@@ -115,6 +115,7 @@ for(const t of db.tasks){if(t.done||t.fired)continue;const r=remindAt(t);if(r==n
 t.fired=true;t.snoozeUntil=null;save();
 if(document.hidden&&'Notification' in window&&Notification.permission==='granted')navigator.serviceWorker.ready.then(g=>g.showNotification('LEGUI · '+t.title,{body:t.desc||'C’est l’heure !',data:{id:t.id},tag:t.id,icon:'assets/icon-192.png'}));
 A.start({id:t.id,title:t.title});break}}
+['pointerdown','touchend','keydown'].forEach(ev=>document.addEventListener(ev,()=>A.unlock(),{once:true,passive:true}));
 setInterval(tick,1000);document.addEventListener('visibilitychange',tick);
 /* ---------- démarrage ---------- */
 if('serviceWorker' in navigator&&location.protocol!=='file:'){navigator.serviceWorker.register('sw.js').catch(()=>{});navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.open){detail=e.data.open;render()}})}
