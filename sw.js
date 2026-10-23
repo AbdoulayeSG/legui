@@ -1,4 +1,4 @@
-const C='legui-v3',F=['./','index.html','css/style.css','js/app.js','js/audioReminderService.js','manifest.webmanifest','assets/sun.jpg','assets/logo.png','assets/icon-192.png'];
+const C='legui-v5',F=['./','index.html','css/style.css','js/app.js','js/audioReminderService.js','manifest.webmanifest','assets/sun.jpg','assets/logo.png','assets/icon-192.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.allSettled(F.map(f=>c.add(f)))));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>clients.claim())));
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==location.origin||u.pathname.includes('/sonds/'))return;

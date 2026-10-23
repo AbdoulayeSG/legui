@@ -37,3 +37,7 @@ input,select,textarea{width:100%;padding:12px;border-radius:14px;border:1px soli
 .brand{position:relative;animation:in .9s both}.logo{width:112px;height:auto}.brand h1{letter-spacing:4px;margin:10px 0 4px}.brand p{color:#fff}
 @keyframes in{from{opacity:0;transform:translateY(10px)}}@keyframes fade{from{opacity:0}}@keyframes up{from{transform:translateY(100%)}}@keyframes pl{50%{transform:scale(1.12);box-shadow:0 0 0 18px #ff790033}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+#sheet.still,#sheet.still>div{animation:none}
+.steps{padding-left:20px;text-align:left;font-size:14px;line-height:1.5}.steps li{margin:8px 0}.steps code{background:var(--gl);padding:1px 6px;border-radius:6px}.steps .cp{min-height:32px;padding:4px 12px;font-size:13px;margin-left:4px}
+label{display:block;margin-top:8px}

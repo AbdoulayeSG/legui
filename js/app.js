@@ -6,7 +6,7 @@ const REMS=[[0,'À l’heure prévue'],[5,'5 minutes avant'],[10,'10 minutes ava
 const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10),T=()=>iso(new Date());
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let db;try{db=JSON.parse(localStorage.getItem(KEY))}catch{}
-db=Object.assign({tasks:[],sessions:[],set:{dark:false,vol:1,snooze:5}},db||{});db.set=Object.assign({dark:false,vol:1,snooze:5},db.set);
+db=Object.assign({tasks:[],sessions:[],set:{dark:false,vol:1,snooze:5,sc:false,scName:'LEGUI'}},db||{});db.set=Object.assign({dark:false,vol:1,snooze:5,sc:false,scName:'LEGUI'},db.set);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch{toast('Stockage local plein ou indisponible')}};
 let view='today',cal={d:T(),mode:'month'},showDone=false,draft=null,step=0,detail=null,fo={len:1500,left:1500,run:false,t:null,start:0,recap:null};
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3000)}
@@ -51,6 +51,12 @@ return `<h2>Paramètres</h2><section class="glass"><b>Apparence</b><div class="r
 <section class="glass"><b>Sons</b><label>Volume <input type="range" min="0" max="1" step=".05" value="${s.vol}" data-a="vol"></label><button class="btn g" data-a="test">Tester la sonnerie</button></section>
 <section class="glass"><b>Rappels</b><label>Report par défaut<select data-a="snz">${[5,10,15,30].map(m=>`<option ${s.snooze===m?'selected':''} value="${m}">${m} minutes</option>`).join('')}</select></label>
 <p>Notifications : ${n}</p><button class="btn g" data-a="perm">Activer les notifications</button><p><small>Application fermée, le navigateur n’autorise qu’une notification. La sonnerie en boucle exige l’application ouverte.</small></p></section>
+<section class="glass"><b>Rappels iPhone</b><p><small>Crée aussi chaque nouvelle tâche (avec heure) dans l’app Rappels, qui sonne même écran verrouillé.</small></p>
+<div class="row seg"><button data-a="sc" data-v="0" class="${!s.sc?'on':''}">Désactivé</button><button data-a="sc" data-v="1" class="${s.sc?'on':''}">Activé</button></div>
+${s.sc?`<label>Nom du raccourci<input data-a="scn" value="${esc(s.scName)}"></label>
+<button class="btn" style="width:100%" data-a="scopen">1 · Ouvrir Raccourcis (nouveau)</button>
+<ol class="steps"><li>Nommez-le <b>${esc(s.scName)}</b>.</li><li>Ajoutez <b>Obtenir un dictionnaire à partir de</b> → <i>Entrée du raccourci</i>.</li><li>Ajoutez <b>Ajouter un nouveau rappel</b>.</li><li>Dans « Rappel », touchez la zone texte, puis la variable <i>Dictionnaire</i> → <b>Obtenir la valeur</b> de la clé <code>title</code> <button class="btn g cp" data-a="cp" data-v="title">Copier</button></li><li>Touchez <b>Plus</b> → Alerte → date : même chose avec la clé <code>alert</code> <button class="btn g cp" data-a="cp" data-v="alert">Copier</button></li><li>Option : Notes ← clé <code>notes</code>.</li></ol>
+<button class="btn ok" style="width:100%" data-a="sctest">2 · Tester (rappel dans 2 min)</button>`:''}</section>
 <section class="glass"><b>Sauvegarde</b><div class="row"><button class="btn g" data-a="exp">Exporter</button><button class="btn g" data-a="imp">Restaurer</button></div><input type="file" id="file" accept=".json" hidden></section>
 <section class="glass"><b>À propos</b><p>LEGUI 1.0 · ${navigator.onLine?'En ligne':'Hors ligne'} · données stockées sur cet appareil</p></section>`}
 function render(){const v={today,cal:calV,stats,focus:focusV,settings}[view]();$('#app').innerHTML=v;$('#fab').hidden=!!draft||!!detail;
@@ -58,7 +64,7 @@ $('#tabs').innerHTML=[['today','☀️','Aujourd’hui'],['cal','📅','Calendri
 document.documentElement.classList.toggle('dark',!!db.set.dark);sheet()}
 /* ---------- feuille : création / détail ---------- */
 const newDraft=d=>({id:null,title:'',desc:'',date:d||T(),time:'',priority:'Normale',cat:'Études',color:COLORS[0],subs:[],repeat:'Aucune',remind:0,...{}});
-function sheet(){const s=$('#sheet');if(!draft&&!detail){s.hidden=true;return}s.hidden=false;let h;
+function sheet(){const s=$('#sheet');if(!draft&&!detail){s.hidden=true;sheet.open=false;return}s.hidden=false;let h;
 if(draft){const d=draft;h=`<div role="dialog"><div class="row"><b style="flex:3">${d.id?'Modifier':'Nouvelle'} tâche · ${step+1}/3</b><button data-a="close">✕</button></div>`+[
 `<div class="row seg"><button data-a="dt" data-v="${T()}" class="${d.date===T()?'on':''}">Aujourd’hui</button><button class="${d.date!==T()?'on':''}" data-a="dt" data-v="">Date…</button></div><input type="date" data-k="date" value="${d.date}"><input data-k="title" placeholder="Titre" value="${esc(d.title)}"><textarea data-k="desc" rows="3" placeholder="Description (optionnelle)">${esc(d.desc)}</textarea>`,
 `<label>Heure <input type="time" data-k="time" value="${d.time}"></label><div class="row seg">${PR.map(p=>`<button data-a="pr" data-v="${p}" class="${d.priority===p?'on':''}">${p}</button>`).join('')}</div>
@@ -70,13 +76,20 @@ if(draft){const d=draft;h=`<div role="dialog"><div class="row"><b style="flex:3"
 else{const t=byId(detail);if(!t){detail=null;return sheet()}
 h=`<div><div class="row"><b style="flex:4;font-size:20px">${esc(t.title)}</b><button data-a="close">✕</button></div><p>${esc(t.cat)} · ${fmt(t.date)} · ${t.time||'Sans heure'} · ${t.priority}</p>${t.desc?`<p>${esc(t.desc)}</p>`:''}
 <p>🔔 ${t.time&&t.remind>=0?REMS.find(r=>r[0]===+t.remind)[1]:'Pas de rappel'} · 🔁 ${t.repeat}</p>${t.subs.length?`<h3>Sous-tâches (${t.subs.filter(x=>x.d).length}/${t.subs.length})</h3>`+t.subs.map((x,i)=>`<div class="task glass ${x.d?'d':''}"><button class="chk" data-a="subtog" data-i="${i}">✓</button><b>${esc(x.t)}</b></div>`).join(''):''}
-<div class="row"><button class="btn g" data-a="edit">Modifier</button><button class="btn g" data-a="push">Reporter</button></div><div class="row"><button class="btn ok" data-a="tog" data-id="${t.id}">${t.done?'Rouvrir':'Terminer'}</button><button class="btn red" data-a="del">Supprimer</button></div></div>`}
-const keep=s.firstChild&&s.firstChild.scrollTop;s.innerHTML=h;}
+<div class="row"><button class="btn g" data-a="edit">Modifier</button><button class="btn g" data-a="push">Reporter</button></div>${db.set.sc&&t.time?'<div class="row"><button class="btn g" data-a="ios">📲 Ajouter à Rappels iPhone</button></div>':''}<div class="row"><button class="btn ok" data-a="tog" data-id="${t.id}">${t.done?'Rouvrir':'Terminer'}</button><button class="btn red" data-a="del">Supprimer</button></div></div>`}
+const wasOpen=sheet.open,keep=wasOpen&&s.firstChild?s.firstChild.scrollTop:0;s.classList.toggle('still',!!wasOpen);s.innerHTML=h;if(keep&&s.firstChild)s.firstChild.scrollTop=keep;sheet.open=true;}
+/* ---------- app Rappels de l'iPhone via Raccourcis ---------- */
+const fmtA=ms=>{const d=new Date(ms);return iso(d)+' '+d.toTimeString().slice(0,5)};
+function openSc(p){const u='shortcuts://run-shortcut?name='+encodeURIComponent(db.set.scName||'LEGUI')+'&input=text&text='+encodeURIComponent(JSON.stringify(p));setTimeout(()=>{location.href=u},80)}
+function sendSc(t,auto){if(!t.time){toast('Choisissez une heure');return}
+const ms=new Date(t.date+'T'+t.time).getTime()-Math.max(0,+t.remind)*6e4;
+if(ms<Date.now()-6e4){if(!auto)toast('Cette heure est déjà passée');return}
+openSc({title:t.title,notes:t.desc||'',alert:fmtA(ms)})}
 /* ---------- actions ---------- */
 function commit(){const d=draft;if(!d.title.trim()){toast('Ajoutez un titre');step=0;return false}
 if(!d.date)d.date=T();if(!d.time)d.remind=-1;const o=d.id&&byId(d.id);
-if(o)Object.assign(o,{...d,title:d.title.trim(),fired:false,snoozeUntil:null});else db.tasks.push({...d,title:d.title.trim(),id:'t'+Date.now(),done:false,fired:false});
-save();draft=null;return true}
+let nt=null;if(o)Object.assign(o,{...d,title:d.title.trim(),fired:false,snoozeUntil:null});else{nt={...d,title:d.title.trim(),id:'t'+Date.now(),done:false,fired:false};db.tasks.push(nt)}
+save();draft=null;if(nt&&db.set.sc&&nt.time&&nt.remind>=0)sendSc(nt,true);return true}
 function toggle(id){const t=byId(id);if(!t)return;t.done=!t.done;t.doneOn=t.done?T():null;
 if(t.done){A.cancel(id);if(t.repeat!=='Aucune'&&!t.next){const n=new Date(t.date+'T00:00');n.setDate(n.getDate()+(t.repeat==='Chaque jour'?1:7));t.next=true;db.tasks.push({...t,id:'t'+Date.now(),date:iso(n),done:false,doneOn:null,fired:false,next:false,snoozeUntil:null,subs:t.subs.map(x=>({...x,d:false}))})}}save()}
 const act={
@@ -90,6 +103,9 @@ subtog(e){const s=byId(detail).subs[+e.i];s.d=!s.d;save()},
 dt(e){draft.date=e.v||T()},pr(e){draft.priority=e.v},col(e){draft.color=e.v},
 addsub(){const i=$('#sub');if(i.value.trim()){draft.subs.push({t:i.value.trim(),d:false})}},rmsub(e){draft.subs.splice(+e.i,1)},
 back(){step--},next(){if(step<2){if(!draft.title.trim()){toast('Ajoutez un titre');return}step++}else if(!commit())return},
+sc(e){db.set.sc=e.v==='1';save()},scopen(){location.href='shortcuts://create-shortcut'},
+sctest(){openSc({title:'Test LEGUI',notes:'Rappel de test',alert:fmtA(Date.now()+2*6e4)})},
+ios(){sendSc(byId(detail))},cp(e){navigator.clipboard&&navigator.clipboard.writeText(e.v).then(()=>toast('« '+e.v+' » copié'),()=>toast('Copie impossible'))},
 theme(e){db.set.dark=e.v==='1';save()},test(){A.start({id:'test',title:'Test de la sonnerie'})},
 perm(){'Notification' in window?Notification.requestPermission().then(render):toast('Notifications indisponibles')},
 exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db)],{type:'application/json'}));a.download='legui-sauvegarde.json';a.click()},
@@ -99,7 +115,7 @@ fplay(){fo.run=true;fo.start=Date.now();fo.base=fo.left;fo.t=setInterval(()=>{fo
 fpause(){clearInterval(fo.t);fo.run=false},freset(){clearInterval(fo.t);fo.run=false;fo.left=fo.len;fo.recap=null}};
 function fend(){clearInterval(fo.t);fo.run=false;fo.recap=Math.round(fo.len/60);db.sessions.push({day:T(),min:fo.recap});save();fo.left=fo.len;A.start({id:'focus',title:'Session Focus terminée'});render()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.tagName==='INPUT'||b.tagName==='SELECT')return;const f=act[b.dataset.a];if(f){f(b.dataset);render()}});
-document.addEventListener('input',e=>{const k=e.target.dataset.k;if(k&&draft)draft[k]=e.target.value;if(e.target.dataset.a==='vol'){db.set.vol=+e.target.value;A.setVolume(db.set.vol);save()}});
+document.addEventListener('input',e=>{const k=e.target.dataset.k;if(k&&draft)draft[k]=e.target.value;if(e.target.dataset.a==='scn'){db.set.scName=e.target.value.trim()||'LEGUI';save()}if(e.target.dataset.a==='vol'){db.set.vol=+e.target.value;A.setVolume(db.set.vol);save()}});
 document.addEventListener('change',e=>{const k=e.target.dataset.k;if(k==='time'||k==='date'&&0){render()}if(e.target.dataset.a==='snz'){db.set.snooze=+e.target.value;save()}
 if(e.target.id==='file'&&e.target.files[0])e.target.files[0].text().then(x=>{try{const j=JSON.parse(x);if(!Array.isArray(j.tasks))throw 0;db=Object.assign(db,j);save();toast('Sauvegarde restaurée');render()}catch{toast('Fichier invalide')}})});
 $('#fab').onclick=()=>{draft=newDraft(view==='cal'?cal.d:T());step=0;render()};
